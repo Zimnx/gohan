@@ -30,6 +30,12 @@
 			"revision": "bcf017cf9222e5e2d1f172de329f5ca7ad539588"
 		},
 		{
+			"checksumSHA1": "xMIDpZGGPcue3D0DXDgxEfjUSGw=",
+			"path": "github.com/cloudwan/goose",
+			"revision": "477d8a85d34faf69e45314c106a21d9ff039c5a1",
+			"revisionTime": "2017-03-30T15:47:14Z"
+		},
+		{
 			"checksumSHA1": "5VX2b0wPZpmryYf3jXwpfQsgGKg=",
 			"comment": "1.2.0-139-g142e6cd",
 			"path": "github.com/codegangsta/cli",
@@ -354,12 +360,6 @@
 			"checksumSHA1": "j0R5Urzq7bkuta4fZyuKVe5IidU=",
 			"path": "github.com/op/go-logging",
 			"revision": "fb0230561a6ba1cab17beb95f1faedc16584fdb8"
-		},
-		{
-			"checksumSHA1": "wlTQrI2jNleFS+jfyfH5o29kvdk=",
-			"path": "github.com/pressly/goose",
-			"revision": "31bb74f65b148c79649dc42e4c4bf3948adfb355",
-			"revisionTime": "2017-03-29T13:44:05Z"
 		},
 		{
 			"checksumSHA1": "/j0HRFJPThv7HEkZZ/gurf+5fQI=",
