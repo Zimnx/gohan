@@ -815,36 +815,7 @@ func shouldJoin(policy schema.LockPolicy) bool {
 
 //Lock resources in the db
 func (tx *Transaction) LockList(s *schema.Schema, filter transaction.Filter, options *transaction.ListOptions, pg *pagination.Paginator, lockPolicy schema.LockPolicy) (list []*schema.Resource, total uint64, err error) {
-	policyJoin := shouldJoin(lockPolicy)
-
-	sc := &selectContext{
-		schema:    s,
-		filter:    filter,
-		join:      policyJoin,
-		paginator: pg,
-	}
-	if options != nil {
-		sc.fields = normFields(options.Fields, s)
-		sc.join = policyJoin && options.Details
-	}
-
-	sql, args, err := buildSelect(sc)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if tx.db.sqlType == "mysql" {
-		sql += " FOR UPDATE"
-	}
-
-	// update join for recursive
-	if options != nil {
-		sc.join = options.Details
-	} else {
-		sc.join = true
-	}
-
-	return tx.executeSelect(sc, sql, args)
+	return tx.List(s, filter, options, pg)
 }
 
 // Query with raw sql string
@@ -948,14 +919,7 @@ func (tx *Transaction) Fetch(s *schema.Schema, filter transaction.Filter) (*sche
 
 //Fetch & lock a resource
 func (tx *Transaction) LockFetch(s *schema.Schema, filter transaction.Filter, lockPolicy schema.LockPolicy) (*schema.Resource, error) {
-	list, _, err := tx.LockList(s, filter, nil, nil, lockPolicy)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to fetch and lock %s: %s", filter, err)
-	}
-	if len(list) < 1 {
-		return nil, transaction.ErrResourceNotFound
-	}
-	return list[0], nil
+	return tx.Fetch(s, filter)
 }
 
 //StateFetch fetches the state of the specified resource
