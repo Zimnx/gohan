@@ -24,6 +24,7 @@ import (
 
 	gohan_db "github.com/cloudwan/gohan/db"
 	"github.com/cloudwan/gohan/db/options"
+	"github.com/cloudwan/gohan/extension"
 	"github.com/cloudwan/gohan/extension/goext"
 	"github.com/cloudwan/gohan/extension/goplugin"
 	logger "github.com/cloudwan/gohan/log"
@@ -33,7 +34,6 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"github.com/satori/go.uuid"
-	"github.com/cloudwan/gohan/extension"
 )
 
 const (
@@ -237,6 +237,7 @@ func (testRunner *TestRunner) runSingle(t ginkgo.GinkgoTestingT, reporter *Repor
 
 	// run test
 	ginkgo.RunSpecsWithCustomReporters(t, pluginFileName, []ginkgo.Reporter{reporter})
+	ginkgo.Reset()
 
 	// stop env
 	env.Stop()

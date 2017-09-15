@@ -17,9 +17,9 @@ package runner
 
 import (
 	"fmt"
-
 	"time"
 
+	"github.com/mohae/deepcopy"
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters/stenographer"
 	"github.com/onsi/ginkgo/types"
@@ -39,6 +39,13 @@ type Reporter struct {
 	specs  []types.SpecSummary
 }
 
+const (
+	configSuccinct = false
+	configFullTrace = true
+	configNoisyPendings = false
+	configSlowSpecThreshold = float64(0.5) // sec
+)
+
 func (reporter *Reporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
 }
 
@@ -49,7 +56,7 @@ func (reporter *Reporter) SpecWillRun(specSummary *types.SpecSummary) {
 }
 
 func (reporter *Reporter) SpecDidComplete(specSummary *types.SpecSummary) {
-	reporter.specs = append(reporter.specs, *specSummary)
+	reporter.specs = append(reporter.specs, deepcopy.Copy(*specSummary).(types.SpecSummary))
 }
 
 func (reporter *Reporter) AfterSuiteDidRun(setupSummary *types.SetupSummary) {
@@ -58,7 +65,7 @@ func (reporter *Reporter) AfterSuiteDidRun(setupSummary *types.SetupSummary) {
 func (reporter *Reporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
 	for i, _ := range reporter.suites {
 		if reporter.suites[i].SuiteDescription == summary.SuiteDescription {
-			reporter.suites[i] = *summary
+			reporter.suites[i] = deepcopy.Copy(*summary).(types.SuiteSummary)
 			break
 		}
 	}
@@ -67,7 +74,7 @@ func (reporter *Reporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
 func (reporter *Reporter) Prepare(description string) {
 	reporter.suites = append(reporter.suites, types.SuiteSummary{
 		SuiteDescription: description,
-		SuiteSucceeded:   false,
+		SuiteSucceeded:   true,
 		SuiteID:          "undefined",
 		NumberOfSpecsBeforeParallelization: 0,
 		NumberOfTotalSpecs:                 0,
@@ -86,36 +93,31 @@ func (reporter *Reporter) Report() {
 	fmt.Println("Failures:")
 	fmt.Println()
 
-	stenographer := stenographer.New(true)
-
-	configSuccinct := false
-	configFullTrace := true
-	configNoisyPendings := false
-	configSlowSpecThreshold := float64(2) // secs
+	steno := stenographer.New(true)
 
 	for _, spec := range reporter.specs {
-		stenographer.AnnounceCapturedOutput(spec.CapturedOutput)
+		steno.AnnounceCapturedOutput(spec.CapturedOutput)
 
 		switch spec.State {
 		case types.SpecStatePassed:
 			if spec.IsMeasurement {
-				stenographer.AnnounceSuccesfulMeasurement(&spec, configSuccinct)
+				steno.AnnounceSuccesfulMeasurement(&spec, configSuccinct)
 			} else if spec.RunTime.Seconds() >= configSlowSpecThreshold {
-				stenographer.AnnounceSuccesfulSlowSpec(&spec, configSuccinct)
+				steno.AnnounceSuccesfulSlowSpec(&spec, configSuccinct)
 			} else {
-				stenographer.AnnounceSuccesfulSpec(&spec)
+				steno.AnnounceSuccesfulSpec(&spec)
 			}
 
 		case types.SpecStatePending:
-			stenographer.AnnouncePendingSpec(&spec, configNoisyPendings && !configSuccinct)
+			steno.AnnouncePendingSpec(&spec, configNoisyPendings && !configSuccinct)
 		case types.SpecStateSkipped:
-			stenographer.AnnounceSkippedSpec(&spec, configSuccinct, configFullTrace)
+			steno.AnnounceSkippedSpec(&spec, configSuccinct, configFullTrace)
 		case types.SpecStateTimedOut:
-			stenographer.AnnounceSpecTimedOut(&spec, configSuccinct, configFullTrace)
+			steno.AnnounceSpecTimedOut(&spec, configSuccinct, configFullTrace)
 		case types.SpecStatePanicked:
-			stenographer.AnnounceSpecPanicked(&spec, configSuccinct, configFullTrace)
+			steno.AnnounceSpecPanicked(&spec, configSuccinct, configFullTrace)
 		case types.SpecStateFailed:
-			stenographer.AnnounceSpecFailed(&spec, configSuccinct, configFullTrace)
+			steno.AnnounceSpecFailed(&spec, configSuccinct, configFullTrace)
 		}
 	}
 
@@ -123,82 +125,55 @@ func (reporter *Reporter) Report() {
 	fmt.Println("Report:")
 	fmt.Println()
 
-	// counters
-	prevNumberOfTotalSpecs := 0
-	prevNumberOfPendingSpecs := 0
-	prevNumberOfSkippedSpecs := 0
-	prevNumberOfPassedSpecs := 0
-	prevNumberOfFailedSpecs := 0
-
-	numberOfTotalSpecs := 0
-	numberOfPendingSpecs := 0
-	numberOfSkippedSpecs := 0
-	numberOfPassedSpecs := 0
-	numberOfFailedSpecs := 0
-	runTime := time.Duration(0) * time.Nanosecond
-
+	// total
 	totalNumberOfTotalSpecs := 0
-	totalNumberOfPendingSpecs := 0
-	totalNumberOfSkippedSpecs := 0
 	totalNumberOfPassedSpecs := 0
 	totalNumberOfFailedSpecs := 0
+	totalNumberOfSkippedSpecs := 0
+	totalNumberOfPendingSpecs := 0
 	totalRunTime := time.Duration(0) * time.Nanosecond
 
-	description := ""
-	succeeded := false
-
+	// suites
 	for index, suite := range reporter.suites {
-		numberOfTotalSpecs = suite.NumberOfTotalSpecs - prevNumberOfTotalSpecs
-		numberOfPendingSpecs = suite.NumberOfPendingSpecs - prevNumberOfPendingSpecs
-		numberOfSkippedSpecs = suite.NumberOfSkippedSpecs - prevNumberOfSkippedSpecs
-		numberOfPassedSpecs = suite.NumberOfPassedSpecs - prevNumberOfPassedSpecs
-		numberOfFailedSpecs = suite.NumberOfFailedSpecs - prevNumberOfFailedSpecs
-		runTime = suite.RunTime
-
-		prevNumberOfTotalSpecs = suite.NumberOfTotalSpecs
-		prevNumberOfPendingSpecs = suite.NumberOfPendingSpecs
-		prevNumberOfSkippedSpecs = suite.NumberOfSkippedSpecs
-		prevNumberOfPassedSpecs = suite.NumberOfPassedSpecs
-		prevNumberOfFailedSpecs = suite.NumberOfFailedSpecs
-
-		totalNumberOfTotalSpecs += numberOfTotalSpecs
-		totalNumberOfPendingSpecs += numberOfPendingSpecs
-		totalNumberOfSkippedSpecs += numberOfSkippedSpecs
-		totalNumberOfPassedSpecs += numberOfPassedSpecs
-		totalNumberOfFailedSpecs += numberOfFailedSpecs
-		totalRunTime += runTime
-
-		description = suite.SuiteDescription
-		succeeded = suite.SuiteSucceeded
-
 		fmt.Printf("[%4d] ", index+1)
-		if succeeded {
-			fmt.Printf(greenColor+"%-80s"+defaultStyle, description)
+		if suite.NumberOfFailedSpecs == 0 {
+			fmt.Printf(greenColor+"%-80s"+defaultStyle, suite.SuiteDescription)
 		} else {
-			fmt.Printf(redColor+"%-80s"+defaultStyle, description)
+			fmt.Printf(redColor+"%-80s"+defaultStyle, suite.SuiteDescription)
 		}
-		fmt.Printf(cyanColor+"total: %-4d%8s"+defaultStyle, numberOfTotalSpecs, "")
-		if succeeded {
-			fmt.Printf(greenColor+"passed: %-4d%8s"+defaultStyle, numberOfPassedSpecs, "")
+		fmt.Printf(cyanColor+"total: %-4d%8s"+defaultStyle, suite.NumberOfTotalSpecs, "")
+		if suite.NumberOfFailedSpecs == 0 {
+			fmt.Printf(greenColor+"passed: %-4d%8s"+defaultStyle, suite.NumberOfPassedSpecs, "")
 		} else {
-			fmt.Printf("passed: %-4d%8s", numberOfPassedSpecs, "")
+			fmt.Printf("passed: %-4d%8s", suite.NumberOfPassedSpecs, "")
 		}
-		if !succeeded {
-			fmt.Printf(redColor+"failed: %-4d%8s"+defaultStyle, numberOfFailedSpecs, "")
+		if suite.NumberOfFailedSpecs > 0 {
+			fmt.Printf(redColor+"failed: %-4d%8s"+defaultStyle, suite.NumberOfFailedSpecs, "")
 		} else {
-			fmt.Printf("failed: %-4d%8s", numberOfFailedSpecs, "")
+			fmt.Printf("failed: %-4d%8s", suite.NumberOfFailedSpecs, "")
 		}
-		if numberOfSkippedSpecs > 0 {
-			fmt.Printf(yellowColor+"skipped: %-4d%8s"+defaultStyle, numberOfSkippedSpecs, "")
+		if suite.NumberOfSkippedSpecs > 0 {
+			fmt.Printf(yellowColor+"skipped: %-4d%8s"+defaultStyle, suite.NumberOfSkippedSpecs, "")
 		} else {
-			fmt.Printf("skipped: %-4d%8s", numberOfSkippedSpecs, "")
+			fmt.Printf("skipped: %-4d%8s", suite.NumberOfSkippedSpecs, "")
 		}
-		if numberOfPendingSpecs > 0 {
-			fmt.Printf(yellowColor + "pending: %-4d%8s" + defaultStyle, numberOfPendingSpecs, "")
+		if suite.NumberOfPendingSpecs > 0 {
+			fmt.Printf(yellowColor+"pending: %-4d%8s"+defaultStyle, suite.NumberOfPendingSpecs, "")
 		} else {
-			fmt.Printf("pending: %-4d%8s", numberOfPendingSpecs, "")
+			fmt.Printf("pending: %-4d%8s", suite.NumberOfPendingSpecs, "")
 		}
-		fmt.Printf("run time: %s\n", runTime)
+		if suite.RunTime >= time.Duration(configSlowSpecThreshold * 1000) * time.Millisecond {
+			fmt.Printf(redColor + "run time: %s\n" + defaultStyle, suite.RunTime)
+		} else {
+			fmt.Printf("run time: %s\n", suite.RunTime)
+		}
+
+		totalNumberOfTotalSpecs += suite.NumberOfTotalSpecs
+		totalNumberOfPassedSpecs += suite.NumberOfPassedSpecs
+		totalNumberOfFailedSpecs += suite.NumberOfFailedSpecs
+		totalNumberOfSkippedSpecs += suite.NumberOfSkippedSpecs
+		totalNumberOfPendingSpecs += suite.NumberOfPendingSpecs
+		totalRunTime += suite.RunTime
 	}
 
 	fmt.Println()
