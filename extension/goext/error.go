@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"runtime/debug"
 )
 
 // Error represents an error code with related HTTP status
@@ -30,6 +31,10 @@ type Error struct {
 
 // NewError returns a new error
 func NewError(status int, err error) *Error {
+	if err == nil {
+		debug.PrintStack()
+		panic(err)
+	}
 	return &Error{
 		Err:    err,
 		Status: status,
