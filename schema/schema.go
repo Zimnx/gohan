@@ -410,7 +410,7 @@ func (schema *Schema) Validate(jsonSchema interface{}, object interface{}) error
 	if result.Valid() {
 		return nil
 	}
-	errDescription := "Json validation error:"
+	errDescription := fmt.Sprintf("%+v Json validation error:", object)
 	for _, err := range result.Errors() {
 		errDescription += fmt.Sprintf("\n\t%v,", err)
 	}
