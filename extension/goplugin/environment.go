@@ -337,7 +337,11 @@ func (env *Environment) dispatchSchemaEvent(prioritizedSchemaHandlers Prioritize
 
 func dispatchSchemaEventForEnv(env IEnvironment, prioritizedSchemaHandlers PrioritizedSchemaHandlers, sch Schema, event string, context map[string]interface{}) error {
 	env.Logger().Debugf("Starting event: %s, schema: %s", event, sch.raw.ID)
-	defer env.Logger().Debugf("Finished event: %s, schema: %s", event, sch.raw.ID)
+	timeEventStarted := time.Now()
+	defer func() {
+		env.Logger().Debugf("Finished event: %s, schema: %s, time: %dms", event, sch.raw.ID, time.Since(timeEventStarted)/time.Millisecond)
+	}()
+
 	var resource goext.Resource
 	var err error
 	if ctxResource, ok := context["resource"]; ok {
