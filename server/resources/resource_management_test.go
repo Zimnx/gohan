@@ -100,12 +100,14 @@ var _ = Describe("Resource manager", func() {
 		}
 		Expect(env.LoadExtensionsForPath(extensions, timeLimit, timeLimits, path)).To(Succeed())
 		environmentManager.RegisterEnvironment(schemaID, env)
+		environmentManager.RegisterEnvironment("network", env)
 	})
 
 	AfterEach(func() {
 		Expect(db.Within(testDB, func(tx transaction.Transaction) error {
 
 			environmentManager.UnRegisterEnvironment(schemaID)
+			environmentManager.UnRegisterEnvironment("network")
 			for _, schema := range schema.GetManager().Schemas() {
 				if whitelist[schema.ID] {
 					continue
@@ -1137,8 +1139,8 @@ var _ = Describe("Resource manager", func() {
 
 	Describe("Updating a resource", func() {
 		var (
-			adminResourceData, memberResourceData map[string]interface{}
-			fakeIdentity                          middleware.IdentityService
+			adminNetworkData, adminNetworkUpdate, adminResourceData, memberResourceData map[string]interface{}
+			fakeIdentity                                                                middleware.IdentityService
 		)
 
 		BeforeEach(func() {
@@ -1159,6 +1161,17 @@ var _ = Describe("Resource manager", func() {
 				"test_number":  0.5,
 				"test_integer": 1,
 				"test_bool":    false,
+			}
+			adminNetworkData = map[string]interface{}{
+				"id": resourceID2,
+			}
+			adminNetworkUpdate = map[string]interface{}{
+
+				"config": map[string]interface{}{
+					"default_vlan": map[string]interface{}{
+						"vlan_id": 5,
+					},
+				},
 			}
 			fakeIdentity = &middleware.FakeIdentity{}
 		})
@@ -1291,6 +1304,27 @@ var _ = Describe("Resource manager", func() {
 					theResource, ok := result[schemaID]
 					Expect(ok).To(BeTrue())
 					Expect(theResource).To(HaveKeyWithValue("test_string", "Ia, ia, HJPEV fhtang!"))
+				})
+
+				It("Should only modify updated fields", func() {
+					networkSchema, _ := manager.Schema("network")
+
+					err := resources.CreateResource(context, testDB, fakeIdentity, networkSchema, adminNetworkData)
+					Expect(err).ToNot(HaveOccurred())
+					result := context["response"].(map[string]interface{})
+
+					err = resources.UpdateResource(context, testDB, fakeIdentity, networkSchema, resourceID2, adminNetworkUpdate)
+					Expect(err).ToNot(HaveOccurred())
+					result = context["response"].(map[string]interface{})
+
+					network, found := result["network"].(map[string]interface{})
+					Expect(found).To(BeTrue())
+					config, found := network["config"].(map[string]interface{})
+					Expect(found).To(BeTrue())
+					defaultVlan, found := config["default_vlan"].(map[string]interface{})
+					Expect(found).To(BeTrue())
+					vlanName := defaultVlan["name"]
+					Expect(vlanName).To(Equal("default_vlan"))
 				})
 			})
 
