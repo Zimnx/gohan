@@ -127,8 +127,7 @@ func (resource *Resource) Update(updateData map[string]interface{}) error {
 		id := property.ID
 
 		if val, ok := updateData[id]; ok {
-			newVal := updateResourceRecursion(val, data[id])
-			data[id] = newVal
+			data[id] = updateResourceRecursion(val, data[id])
 		}
 	}
 	return nil
