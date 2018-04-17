@@ -101,6 +101,7 @@ var _ = Describe("Resource manager", func() {
 		Expect(env.LoadExtensionsForPath(extensions, timeLimit, timeLimits, path)).To(Succeed())
 		environmentManager.RegisterEnvironment(schemaID, env)
 		environmentManager.RegisterEnvironment("network", env)
+		environmentManager.RegisterEnvironment("nil_test", env)
 	})
 
 	AfterEach(func() {
@@ -108,6 +109,7 @@ var _ = Describe("Resource manager", func() {
 
 			environmentManager.UnRegisterEnvironment(schemaID)
 			environmentManager.UnRegisterEnvironment("network")
+			environmentManager.UnRegisterEnvironment("nil_test")
 			for _, schema := range schema.GetManager().Schemas() {
 				if whitelist[schema.ID] {
 					continue
@@ -1366,6 +1368,28 @@ var _ = Describe("Resource manager", func() {
 					network, found = result["network"].(map[string]interface{})
 					Expect(found).To(BeTrue())
 					Expect(network["route_targets"]).To(Equal([]interface{}{"testTarget2", "testTarget3"}))
+				})
+
+				It("Should properly update nil objects", func() {
+					testSchema, _ := manager.Schema("nil_test")
+					Expect(resources.CreateResource(context, testDB, fakeIdentity, testSchema, map[string]interface{}{"id": resourceID2})).To(Succeed())
+					result := context["response"].(map[string]interface{})
+					mainObject, found := result["nil_test"].(map[string]interface{})
+					Expect(found).To(BeTrue())
+					subObject := mainObject["nested_obj"]
+					Expect(subObject).To(BeNil())
+
+					Expect(resources.UpdateResource(context, testDB, fakeIdentity, testSchema, resourceID2, map[string]interface{}{
+						"nested_obj": map[string]interface{}{
+							"nested_string": "nestedString",
+						}})).To(Succeed())
+					result = context["response"].(map[string]interface{})
+					mainObject, found = result["nil_test"].(map[string]interface{})
+					Expect(found).To(BeTrue())
+					subObject, found = mainObject["nested_obj"]
+
+					Expect(found).To(BeTrue())
+					Expect(subObject.(map[string]interface{})["nested_string"]).To(Equal("nestedString"))
 				})
 			})
 
