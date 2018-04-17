@@ -1139,8 +1139,8 @@ var _ = Describe("Resource manager", func() {
 
 	Describe("Updating a resource", func() {
 		var (
-			adminNetworkData, adminNetworkUpdate, adminResourceData, memberResourceData map[string]interface{}
-			fakeIdentity                                                                middleware.IdentityService
+			adminResourceData, memberResourceData map[string]interface{}
+			fakeIdentity                          middleware.IdentityService
 		)
 
 		BeforeEach(func() {
@@ -1162,17 +1162,7 @@ var _ = Describe("Resource manager", func() {
 				"test_integer": 1,
 				"test_bool":    false,
 			}
-			adminNetworkData = map[string]interface{}{
-				"id": resourceID2,
-			}
-			adminNetworkUpdate = map[string]interface{}{
 
-				"config": map[string]interface{}{
-					"default_vlan": map[string]interface{}{
-						"vlan_id": 5,
-					},
-				},
-			}
 			fakeIdentity = &middleware.FakeIdentity{}
 		})
 
@@ -1284,6 +1274,25 @@ var _ = Describe("Resource manager", func() {
 			})
 
 			Context("As an admin", func() {
+				var (
+					adminNetworkData, adminNetworkUpdate map[string]interface{}
+				)
+
+				BeforeEach(func() {
+					adminNetworkData = map[string]interface{}{
+						"id":            resourceID2,
+						"route_targets": []interface{}{"routeTarget1"},
+					}
+
+					adminNetworkUpdate = map[string]interface{}{
+						"config": map[string]interface{}{
+							"default_vlan": map[string]interface{}{
+								"vlan_id": 5,
+							},
+						},
+					}
+				})
+
 				It("Should update own resource", func() {
 					err := resources.UpdateResource(
 						context, testDB, fakeIdentity, currentSchema, resourceID1,
@@ -1306,17 +1315,12 @@ var _ = Describe("Resource manager", func() {
 					Expect(theResource).To(HaveKeyWithValue("test_string", "Ia, ia, HJPEV fhtang!"))
 				})
 
-				It("Should only modify updated fields", func() {
+				It("Should only modify updated fields in subobjects", func() {
 					networkSchema, _ := manager.Schema("network")
 
-					err := resources.CreateResource(context, testDB, fakeIdentity, networkSchema, adminNetworkData)
-					Expect(err).ToNot(HaveOccurred())
+					Expect(resources.CreateResource(context, testDB, fakeIdentity, networkSchema, adminNetworkData)).To(Succeed())
+
 					result := context["response"].(map[string]interface{})
-
-					err = resources.UpdateResource(context, testDB, fakeIdentity, networkSchema, resourceID2, adminNetworkUpdate)
-					Expect(err).ToNot(HaveOccurred())
-					result = context["response"].(map[string]interface{})
-
 					network, found := result["network"].(map[string]interface{})
 					Expect(found).To(BeTrue())
 					config, found := network["config"].(map[string]interface{})
@@ -1325,6 +1329,43 @@ var _ = Describe("Resource manager", func() {
 					Expect(found).To(BeTrue())
 					vlanName := defaultVlan["name"]
 					Expect(vlanName).To(Equal("default_vlan"))
+					vlanId := defaultVlan["vlan_id"]
+					Expect(vlanId).To(Equal(1)) // default vlan_id value
+
+					Expect(resources.UpdateResource(context, testDB, fakeIdentity, networkSchema, resourceID2, adminNetworkUpdate)).To(Succeed())
+
+					result = context["response"].(map[string]interface{})
+					network, found = result["network"].(map[string]interface{})
+					Expect(found).To(BeTrue())
+					config, found = network["config"].(map[string]interface{})
+					Expect(found).To(BeTrue())
+					defaultVlan, found = config["default_vlan"].(map[string]interface{})
+					Expect(found).To(BeTrue())
+					vlanName = defaultVlan["name"]
+					Expect(vlanName).To(Equal("default_vlan"))
+					vlanId = defaultVlan["vlan_id"]
+					Expect(vlanId).To(Equal(5))
+				})
+
+				It("Should properly update array values", func() {
+					networkSchema, _ := manager.Schema("network")
+
+					Expect(resources.CreateResource(context, testDB, fakeIdentity, networkSchema, adminNetworkData)).To(Succeed())
+
+					result := context["response"].(map[string]interface{})
+					network, found := result["network"].(map[string]interface{})
+					Expect(found).To(BeTrue())
+					routeTargets := network["route_targets"]
+					Expect(routeTargets).To(Equal([]interface{}{"routeTarget1"}))
+
+					Expect(resources.UpdateResource(context, testDB, fakeIdentity, networkSchema, resourceID2, map[string]interface{}{
+						"route_targets": []interface{}{"testTarget2", "testTarget3"},
+					})).To(Succeed())
+
+					result = context["response"].(map[string]interface{})
+					network, found = result["network"].(map[string]interface{})
+					Expect(found).To(BeTrue())
+					Expect(network["route_targets"]).To(Equal([]interface{}{"testTarget2", "testTarget3"}))
 				})
 			})
 
