@@ -162,6 +162,8 @@ func (schema *Schema) listImpl(requestContext goext.Context, list listFunc) ([]i
 		return nil, err
 	}
 
+	schema.env.Logger().Debugf("Listed %s resources: %s", schema.ID(), data)
+
 	res := make([]interface{}, len(data), len(data))
 
 	for i := 0; i < len(data); i++ {
@@ -290,6 +292,7 @@ func (schema *Schema) fetch(filter goext.Filter, context goext.Context, fetcher 
 		return nil, err
 	}
 
+	schema.env.Logger().Debugf("Fetched %s resource: %s", schema.ID(), data)
 	return processor(schema.ResourceFromMap(data))
 }
 
