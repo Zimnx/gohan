@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"reflect"
+
 	"github.com/cloudwan/gohan/db"
 	"github.com/cloudwan/gohan/db/pagination"
 	"github.com/cloudwan/gohan/db/transaction"
@@ -793,6 +795,22 @@ func UpdateResourceInTransaction(
 	err = policy.ApplyPropertyConditionFilter(schema.ActionUpdate, resource.Data(), dataMap)
 	if err != nil {
 		return ResourceError{err, "", Unauthorized}
+	}
+
+	if _, ok := context["go_validation"]; ok {
+		// Go compiler fills fields which are of primitive type with 'zero value' if any golang extension
+		// have registered for PreUpdate event.
+		// This means that some fields will appear in dataMap, even they were not present
+		// in API request nor added by PreUpdate handler.
+		// This loop will remove all 'zero values' from dataMap.
+		isZeroOfUnderlyingType := func(x interface{}) bool {
+			return reflect.DeepEqual(x, reflect.Zero(reflect.TypeOf(x)).Interface())
+		}
+		for k, v := range dataMap {
+			if isZeroOfUnderlyingType(v) {
+				delete(dataMap, k)
+			}
+		}
 	}
 
 	err = resource.Update(dataMap)
