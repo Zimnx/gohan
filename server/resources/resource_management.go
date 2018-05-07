@@ -802,12 +802,15 @@ func UpdateResourceInTransaction(
 		// have registered for PreUpdate event.
 		// This means that some fields will appear in dataMap, even they were not present
 		// in API request nor added by PreUpdate handler.
-		// This loop will remove all 'zero values' from dataMap.
+		// This loop will remove all 'zero values' from dataMap which doesn't appear in original request data.
 		isZeroOfUnderlyingType := func(x interface{}) bool {
 			return reflect.DeepEqual(x, reflect.Zero(reflect.TypeOf(x)).Interface())
 		}
+
+		requestData := context["request_data"].(map[string]interface{})
 		for k, v := range dataMap {
-			if isZeroOfUnderlyingType(v) {
+			_, isInRequest := requestData[k]
+			if !isInRequest && isZeroOfUnderlyingType(v) {
 				delete(dataMap, k)
 			}
 		}
